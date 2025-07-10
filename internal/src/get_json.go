@@ -16,10 +16,9 @@ func Get_json_file(game_id string) string {
 		log.Fatal("Ошибка в отпрапвке GET запроса для получения json", err)
 	}
 
-	resp.Body.Close()
-
 	respBody, err := io.ReadAll(resp.Body)
 
-	fmt.Printf(string(respBody))
-	return ""
+	resp.Body.Close()
+
+	return string(respBody)
 }
