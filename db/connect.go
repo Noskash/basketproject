@@ -36,7 +36,7 @@ func Connect_to_database() (*sql.DB, error) {
 		CREATE TABLE IF NOT EXISTS matches(
 			id SERIAL PRIMARY KEY,
 			game_id VARCHAR(255) NOT NULL,
-			url VARCHAR(255) NOT NULL
+			url VARCHAR(255) NOT NULL,
 			count VARCHAR(255) NOT NULL 
 		)
 	`)
