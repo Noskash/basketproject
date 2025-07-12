@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -14,9 +15,12 @@ func main() {
 
 	if err != nil {
 		log.Fatal("Ошибка при подключении к бд")
+	} else {
+		fmt.Print("Подключено к бд")
 	}
 
 	http.HandleFunc("/addmatch", src.Get_json_file(db))
+	http.ListenAndServe(":8080", nil)
 
 	ticker := time.NewTicker(5 * time.Second)
 
