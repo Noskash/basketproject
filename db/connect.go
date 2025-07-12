@@ -20,6 +20,11 @@ func Connect_to_database() (*sql.DB, error) {
 	SSLMODE := os.Getenv("SSLMODE")
 	Password := os.Getenv("PASSWORD")
 	User := os.Getenv("USER")
+	fmt.Println("DB_NAME:", Db_Name)
+	fmt.Println("PORT:", Port)
+	fmt.Println("SSLMODE:", SSLMODE)
+	fmt.Println("PASSWORD:", Password)
+	fmt.Println("USER:", User)
 	connectStr := fmt.Sprintf(
 		"postgres://%s:%s@localhost:%s/%s?sslmode=%s",
 		User, Password, Port, Db_Name, SSLMODE,
