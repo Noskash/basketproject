@@ -114,39 +114,53 @@ func Get_json_file(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var request Request
 		err := json.NewDecoder(r.Body).Decode(&request)
-
 		if err != nil {
-			log.Fatal("Ошибка в декодироавании http запроса", err)
+			log.Fatal("Ошибка в декодировании http запроса:", err)
 		}
 
 		req_Url := fmt.Sprintf("https://line31w.bk6bba-resources.com/events/event?lang=en&version=55248127755&eventId=%s&scopeMarket=1600", request.Game_id)
 
 		resp, err := http.Get(req_Url)
-
 		if err != nil {
-			log.Fatal("Ошибка в отпрапвке GET запроса для получения json", err)
+			log.Fatal("Ошибка при GET-запросе:", err)
 		}
+		defer resp.Body.Close()
 
 		respBody, err := io.ReadAll(resp.Body)
-
 		if err != nil {
-			log.Fatal("Ошибка при декодировании ответа от fonbet")
+			log.Fatal("Ошибка при чтении тела ответа:", err)
 		}
-
-		resp.Body.Close()
 
 		var jsons Root
-
 		if err := json.Unmarshal(respBody, &jsons); err != nil {
-			log.Fatal("Ошибка при декодировании json")
+			log.Fatal("Ошибка при декодировании JSON:", err)
 		}
 
-		if _, err := db.Exec("INSERT INTO matches(game_id , url , count) values($1 , $2 , $3)", request.Game_id, req_Url, jsons.EventMiscs[0].Comment); err != nil {
-			log.Fatal("Ошибка при вставке матча в таблицу matches", err)
+		// Вставляем матч в таблицу matches
+		if _, err := db.Exec(
+			"INSERT INTO matches(game_id, url, count) VALUES ($1, $2, $3)",
+			request.Game_id, req_Url, jsons.EventMiscs[0].Comment); err != nil {
+			log.Fatal("Ошибка при вставке в matches:", err)
 		}
-		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS %s(
-			number int , value int,)`, request.Game_id); err != nil {
-			log.Fatal("Ошибка при создании таблицы ", request.Game_id, err)
+
+		tableName := request.Game_id
+		createTableQuery := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS "%s" (
+			number INT,
+			value  DOUBLE PRECISION
+		)`, tableName)
+
+		if _, err := db.Exec(createTableQuery); err != nil {
+			log.Fatal("Ошибка при создании таблицы:", tableName, err)
+		}
+
+		insertQuery := fmt.Sprintf(`INSERT INTO "%s" (number, value) VALUES ($1, $2)`, tableName)
+		for _, cf := range jsons.CustomFactors {
+			for _, f := range cf.Factors {
+				_, err := db.Exec(insertQuery, f.F, f.V)
+				if err != nil {
+					log.Println("Ошибка при вставке фактора:", err)
+				}
+			}
 		}
 	}
 }

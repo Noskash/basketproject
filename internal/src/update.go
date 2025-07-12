@@ -3,84 +3,80 @@ package src
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 )
 
 func Update_values(db *sql.DB) {
-	urls, err := db.Query("SELECT game_id ,url FROM matches")
-
+	urls, err := db.Query("SELECT game_id, url FROM matches")
 	if err != nil {
-		log.Fatal("Ошибка во время выборки url из бд", err)
+		log.Fatal("Ошибка во время выборки url из БД:", err)
 	}
-
 	defer urls.Close()
 
 	for urls.Next() {
+		var gameID string
 		var url string
-		var game_id string
-		err := urls.Scan(&game_id, &url)
+		if err := urls.Scan(&gameID, &url); err != nil {
+			log.Fatal("Ошибка при сканировании данных из БД:", err)
+		}
 
-		if err != nil {
-			log.Fatal("Ошибка при сканировании данных из бд")
+		// Проверяем, что имя таблицы безопасное
+		valid := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+		if !valid.MatchString(gameID) {
+			log.Fatal("Недопустимое имя таблицы:", gameID)
 		}
 
 		resp, err := http.Get(url)
-
 		if err != nil {
-			log.Fatal("Ошибка в отпрапвке GET запроса для получения json", err)
+			log.Fatal("Ошибка при GET-запросе:", err)
 		}
+		defer resp.Body.Close()
 
 		respBody, err := io.ReadAll(resp.Body)
-
 		if err != nil {
-			log.Fatal("Ошибка при декодировании ответа от fonbet")
+			log.Fatal("Ошибка при чтении тела ответа:", err)
 		}
-
-		resp.Body.Close()
 
 		var jsons Root
-
 		if err := json.Unmarshal(respBody, &jsons); err != nil {
-			log.Fatal("Ошибка при декодировании json")
+			log.Fatal("Ошибка при декодировании JSON:", err)
 		}
-		new_title := game_id + "_new"
+
+		newTable := gameID + "_new"
+
+		// Создаём временную таблицу
+		createNewTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS "%s" (
+			number INT,
+			value  DOUBLE PRECISION
+		)`, newTable)
+		if _, err := db.Exec(createNewTable); err != nil {
+			log.Fatal("Ошибка при создании временной таблицы:", err)
+		}
+
+		// Вставляем значения во временную таблицу
+		insertNew := fmt.Sprintf(`INSERT INTO "%s" (number, value) VALUES ($1, $2)`, newTable)
 		for _, cf := range jsons.CustomFactors {
 			for _, fv := range cf.Factors {
-				var exists bool
-
-				if err := db.QueryRow("SELECT EXISTS(*) FROM %s WHERE number = $1", game_id, fv.F).Scan(&exists); err != nil {
-					log.Fatal("Ошибка при запросе в базу данных ", game_id)
-				}
-				if !exists {
-					_, err := db.Exec("INSERT INTO %s (number , value) VALUES($1 , $2)", game_id, fv.F, fv.V)
-					if err != nil {
-						log.Fatal("Ошибка при вставке данных в ", game_id)
-					}
-				} else {
-					_, err := db.Exec("DROP TABLE IF EXISTS %s", new_title)
-
-					if err != nil {
-						log.Fatal("Ошибка при удалении временной бд номером", game_id)
-					}
-
-					if _, err := db.Exec("CREATE TABLE %s(number int , value int)", new_title); err != nil {
-						log.Fatal("Ошибка при создании временной бд с номером ", new_title, err)
-					}
-
-					if _, err := db.Exec("INSERT INTO %s(number , value) VALUES ($1 , $2)", new_title, fv.F, fv.V); err != nil {
-						log.Fatal("Ошибка при вставке данных во временную базу данных с номером", new_title, err)
-					}
+				_, err := db.Exec(insertNew, fv.F, fv.V)
+				if err != nil {
+					log.Println("Ошибка при вставке значения в", newTable, ":", err)
 				}
 			}
 		}
-		if _, err := db.Exec("DROP TABLE IF EXISTS %s", game_id); err != nil {
-			log.Fatal("Ошибка при удалении таблицы с номером", game_id)
+
+		// Удаляем старую таблицу и переименовываем новую
+		dropOld := fmt.Sprintf(`DROP TABLE IF EXISTS "%s"`, gameID)
+		if _, err := db.Exec(dropOld); err != nil {
+			log.Fatal("Ошибка при удалении старой таблицы:", err)
 		}
 
-		if _, err := db.Exec("ALTER TABLE %s RENAME $1", new_title, game_id); err != nil {
-			log.Fatal("Ошибка при замене базы данных с номером", game_id)
+		rename := fmt.Sprintf(`ALTER TABLE "%s" RENAME TO "%s"`, newTable, gameID)
+		if _, err := db.Exec(rename); err != nil {
+			log.Fatal("Ошибка при переименовании временной таблицы:", err)
 		}
 	}
 }
