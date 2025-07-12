@@ -5,16 +5,21 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
+var loadEnvOnce sync.Once
+
 func Connect_to_database() (*sql.DB, error) {
-	err := godotenv.Load("../.env")
-	if err != nil {
-		log.Fatal("Ошибка при загрузке .env файла")
-	}
+	loadEnvOnce.Do(func() {
+		err := godotenv.Load("../.env")
+		if err != nil {
+			log.Fatal("Ошибка при загрузке .env файла")
+		}
+	})
 	connectStr := fmt.Sprintf(
 		"postgres://%s:%s@localhost:%s/%s?sslmode=%s",
 		os.Getenv("USER"),
