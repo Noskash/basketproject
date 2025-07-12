@@ -144,7 +144,7 @@ func Get_json_file(db *sql.DB) http.HandlerFunc {
 		if _, err := db.Exec("INSERT INTO matches(game_id , url , count) values($1 , $2 , $3)", request.Game_id, req_Url, jsons.EventMiscs[0].Comment); err != nil {
 			log.Fatal("Ошибка при вставке матча в таблицу matches", err)
 		}
-		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS $1(
+		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS %s(
 			number int , value int,)`, request.Game_id); err != nil {
 			log.Fatal("Ошибка при создании таблицы ", request.Game_id, err)
 		}

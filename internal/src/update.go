@@ -50,36 +50,36 @@ func Update_values(db *sql.DB) {
 			for _, fv := range cf.Factors {
 				var exists bool
 
-				if err := db.QueryRow("SELECT EXISTS(*) FROM $1 WHERE number = $2", game_id, fv.F).Scan(&exists); err != nil {
+				if err := db.QueryRow("SELECT EXISTS(*) FROM %s WHERE number = $1", game_id, fv.F).Scan(&exists); err != nil {
 					log.Fatal("Ошибка при запросе в базу данных ", game_id)
 				}
 				if !exists {
-					_, err := db.Exec("INSERT INTO $1 (number , value) VALUES($2 , $3)", game_id, fv.F, fv.V)
+					_, err := db.Exec("INSERT INTO %s (number , value) VALUES($1 , $2)", game_id, fv.F, fv.V)
 					if err != nil {
 						log.Fatal("Ошибка при вставке данных в ", game_id)
 					}
 				} else {
-					_, err := db.Exec("DROP TABLE IF EXISTS $1", new_title, err)
+					_, err := db.Exec("DROP TABLE IF EXISTS %s", new_title)
 
 					if err != nil {
 						log.Fatal("Ошибка при удалении временной бд номером", game_id)
 					}
 
-					if _, err := db.Exec("CREATE TABLE $1(number int , value int)"); err != nil {
+					if _, err := db.Exec("CREATE TABLE %s(number int , value int)", new_title); err != nil {
 						log.Fatal("Ошибка при создании временной бд с номером ", new_title, err)
 					}
 
-					if _, err := db.Exec("INSERT INTO $1(number , value) VALUES ($2 , $3)", new_title, fv.F, fv.V); err != nil {
+					if _, err := db.Exec("INSERT INTO %s(number , value) VALUES ($1 , $2)", new_title, fv.F, fv.V); err != nil {
 						log.Fatal("Ошибка при вставке данных во временную базу данных с номером", new_title, err)
 					}
 				}
 			}
 		}
-		if _, err := db.Exec("DROP TABLE IF EXISTS $1", game_id); err != nil {
+		if _, err := db.Exec("DROP TABLE IF EXISTS %s", game_id); err != nil {
 			log.Fatal("Ошибка при удалении таблицы с номером", game_id)
 		}
 
-		if _, err := db.Exec("ALTER TABLE $1 RENAME $2", new_title, game_id); err != nil {
+		if _, err := db.Exec("ALTER TABLE %s RENAME $1", new_title, game_id); err != nil {
 			log.Fatal("Ошибка при замене базы данных с номером", game_id)
 		}
 	}
