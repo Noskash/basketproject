@@ -1,6 +1,7 @@
 package src
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -105,23 +106,47 @@ type Factor struct {
 	PT *string `json:"pt,omitempty"`
 }
 
-func Get_json_file(game_id string) Root {
-	reqUrl := fmt.Sprintf("https://line31w.bk6bba-resources.com/events/event?lang=en&version=55248127755&eventId=%s&scopeMarket=1600", game_id)
+type Request struct {
+	Game_id string `json:"game_id"`
+}
 
-	resp, err := http.Get(reqUrl)
+func Get_json_file(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var request Request
+		err := json.NewDecoder(r.Body).Decode(&request)
 
-	if err != nil {
-		log.Fatal("Ошибка в отпрапвке GET запроса для получения json", err)
+		if err != nil {
+			log.Fatal("Ошибка в декодироавании http запроса", err)
+		}
+
+		req_Url := fmt.Sprintf("https://line31w.bk6bba-resources.com/events/event?lang=en&version=55248127755&eventId=%s&scopeMarket=1600", request.Game_id)
+
+		resp, err := http.Get(req_Url)
+
+		if err != nil {
+			log.Fatal("Ошибка в отпрапвке GET запроса для получения json", err)
+		}
+
+		respBody, err := io.ReadAll(resp.Body)
+
+		if err != nil {
+			log.Fatal("Ошибка при декодировании ответа от fonbet")
+		}
+
+		resp.Body.Close()
+
+		var jsons Root
+
+		if err := json.Unmarshal(respBody, &jsons); err != nil {
+			log.Fatal("Ошибка при декодировании json")
+		}
+
+		if _, err := db.Exec("INSERT INTO matches(game_id , url , count) values($1 , $2 , $3)", request.Game_id, req_Url, jsons.EventMiscs[0].Comment); err != nil {
+			log.Fatal("Ошибка при вставке матча в таблицу matches", err)
+		}
+		if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS $1(
+			number int , value int)`, request.Game_id); err != nil {
+			log.Fatal("Ошибка при создании таблицы ", request.Game_id, err)
+		}
 	}
-
-	respBody, err := io.ReadAll(resp.Body)
-
-	resp.Body.Close()
-
-	var jsons Root
-
-	if err := json.Unmarshal(respBody, &jsons); err != nil {
-		log.Fatal("Ошибка при декодировании json")
-	}
-	return jsons
 }
