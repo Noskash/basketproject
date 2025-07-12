@@ -16,7 +16,6 @@ func Connect_to_database() (*sql.DB, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	connectStr := fmt.Sprintf(
 		"postgres://%s:%s@localhost:%s/%s?sslmode=%s",
 		os.Getenv("USER"),
