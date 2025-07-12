@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
 )
 
 func Update_values(db *sql.DB) {
@@ -22,12 +21,6 @@ func Update_values(db *sql.DB) {
 		var url string
 		if err := urls.Scan(&gameID, &url); err != nil {
 			log.Fatal("Ошибка при сканировании данных из БД:", err)
-		}
-
-		// Проверяем, что имя таблицы безопасное
-		valid := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-		if !valid.MatchString(gameID) {
-			log.Fatal("Недопустимое имя таблицы:", gameID)
 		}
 
 		resp, err := http.Get(url)
@@ -48,7 +41,6 @@ func Update_values(db *sql.DB) {
 
 		newTable := gameID + "_new"
 
-		// Создаём временную таблицу
 		createNewTable := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS "%s" (
 			number INT,
 			value  DOUBLE PRECISION
@@ -57,7 +49,6 @@ func Update_values(db *sql.DB) {
 			log.Fatal("Ошибка при создании временной таблицы:", err)
 		}
 
-		// Вставляем значения во временную таблицу
 		insertNew := fmt.Sprintf(`INSERT INTO "%s" (number, value) VALUES ($1, $2)`, newTable)
 		for _, cf := range jsons.CustomFactors {
 			for _, fv := range cf.Factors {
@@ -68,7 +59,6 @@ func Update_values(db *sql.DB) {
 			}
 		}
 
-		// Удаляем старую таблицу и переименовываем новую
 		dropOld := fmt.Sprintf(`DROP TABLE IF EXISTS "%s"`, gameID)
 		if _, err := db.Exec(dropOld); err != nil {
 			log.Fatal("Ошибка при удалении старой таблицы:", err)
