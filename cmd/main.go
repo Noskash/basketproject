@@ -1,14 +1,31 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"log"
+	"net/http"
+	"time"
 
+	"github.com/Noskash/basketproject/db"
 	"github.com/Noskash/basketproject/internal/src"
 )
 
 func main() {
-	res := src.Get_json_file("56615507")
-	data, _ := json.MarshalIndent(res, " ", " ")
-	fmt.Printf(string(data))
+	db, err := db.Connect_to_database()
+
+	if err != nil {
+		log.Fatal("Ошибка при подключении к бд")
+	}
+
+	http.HandleFunc("/addmatch", src.Get_json_file(db))
+
+	ticker := time.NewTicker(5 * time.Second)
+
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			src.Update_values(db)
+		}
+	}
 }
